@@ -1,0 +1,216 @@
+// Refilwe Molapisi — Professional Analytics Portfolio
+// Data model per professional_analytics_portfolio_spec.md §5
+// Hosted on Supabase Postgres. JSON-string fields are kept as text columns
+// (validated app-side) so the schema works identically on any Postgres host.
+// NOTE: enums are avoided on purpose — status values are plain strings
+// validated in application code.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")   // pooled connection (pgBouncer, port 6543) — runtime queries
+  directUrl = env("DIRECT_URL")     // direct connection (port 5432) — migrations & introspection
+}
+
+// ─── Profile & site settings (singleton row, id = "singleton") ───────────────
+
+model SiteSettings {
+  id                     String   @id @default("singleton")
+  displayName            String   @default("Refilwe Molapisi")
+  headline               String   @default("Final-year BCom Economics student")
+  intro                  String   @default("")
+  biography              String   @default("")
+  educationSummary       String   @default("")
+  professionalInterests String   @default("") // one interest per line
+  linkedinUrl            String   @default("")
+  publicEmail            String?
+  homeIntro              String   @default("")
+  footerText             String   @default("")
+  defaultMetaTitle       String   @default("")
+  defaultMetaDescription String   @default("")
+  updatedAt              DateTime @updatedAt
+}
+
+// ─── Categories (shared by projects & research) ──────────────────────────────
+
+model Category {
+  id           String   @id @default(cuid())
+  name         String
+  slug         String   @unique
+  contentType  String   @default("both") // project | research | both
+  description  String?
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  projects Project[]
+  articles ResearchArticle[]
+}
+
+// ─── Projects ────────────────────────────────────────────────────────────────
+
+model Project {
+  id                  String      @id @default(cuid())
+  title               String
+  slug                String      @unique
+  summary             String
+  coverImageId        String?
+  coverImage          MediaAsset? @relation("ProjectCover", fields: [coverImageId], references: [id], onDelete: SetNull)
+  categoryId          String?
+  category            Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  projectType         String      @default("Self-directed") // Academic | Self-directed | Simulated case study | Internship / work
+  statusLabel         String? // e.g. "Completed", "In progress"
+  projectDate         String? // free text, e.g. "2026" or "Mar – Jun 2026"
+  tools               String      @default("[]") // JSON string[]
+  dataNotice          String? // e.g. synthetic data disclosure
+  researchQuestion    String      @default("")
+  context             String      @default("")
+  datasetDescription  String      @default("")
+  datasetSourceUrls   String      @default("[]") // JSON {text,url}[]
+  dataPeriod          String?
+  geographicCoverage  String?
+  licenceNotes        String?
+  dataCleaningNotes   String?
+  methodology         String      @default("")
+  body                String      @default("") // analysis steps (markdown)
+  findings            String      @default("")
+  recommendations     String      @default("")
+  limitations         String      @default("")
+  lessons             String      @default("")
+  repositoryUrl       String?
+  dashboardUrl        String?
+  supportingFiles     String      @default("[]") // JSON MediaAsset id[]
+  references          String      @default("[]") // JSON {text,url}[]
+  relatedProjectIds   String      @default("[]") // JSON id[]
+  isFeatured          Boolean     @default(false)
+  displayOrder        Int         @default(0)
+  status              String      @default("draft") // draft | published | archived
+  metaTitle           String?
+  metaDescription     String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  publishedAt         DateTime?
+  archivedAt          DateTime?
+
+  tags        Tag[]
+
+  @@index([status, publishedAt])
+  @@index([categoryId])
+  @@index([isFeatured, displayOrder])
+}
+
+// ─── Research articles ───────────────────────────────────────────────────────
+
+model ResearchArticle {
+  id                 String      @id @default(cuid())
+  title              String
+  slug               String      @unique
+  summary            String
+  body               String      @default("") // markdown
+  categoryId         String?
+  topic              Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  contentType        String      @default("Research brief") // Research brief | Market commentary | Policy analysis | Literature review | Data note
+  researchQuestion   String?
+  methodology        String?
+  findings           String?
+  limitations        String?
+  references         String      @default("[]") // JSON {text,url}[]
+  coverImageId       String?
+  coverImage         MediaAsset? @relation("ArticleCover", fields: [coverImageId], references: [id], onDelete: SetNull)
+  pdfAssetId         String?
+  pdfAsset           MediaAsset? @relation("ArticlePdf", fields: [pdfAssetId], references: [id], onDelete: SetNull)
+  readingTimeMinutes Int         @default(1)
+  isFeatured         Boolean     @default(false)
+  displayOrder       Int         @default(0)
+  status             String      @default("draft")
+  metaTitle          String?
+  metaDescription    String?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  publishedAt        DateTime?
+  archivedAt         DateTime?
+
+  tags      Tag[]
+
+  @@index([status, publishedAt])
+  @@index([categoryId])
+}
+
+// ─── Tags (many-to-many with projects & articles) ────────────────────────────
+
+model Tag {
+  id       String @id @default(cuid())
+  name     String
+  slug     String @unique
+
+  projects Project[]
+  articles ResearchArticle[]
+}
+
+// ─── Skills ──────────────────────────────────────────────────────────────────
+
+model Skill {
+  id           String   @id @default(cuid())
+  name         String
+  slug         String   @unique
+  groupName    String   @default("Data analysis and BI")
+  statusLabel  String   @default("Learning") // Learning | Practising | Project experience | Confident
+  description  String   @default("")
+  evidenceUrl  String?
+  displayOrder Int      @default(0)
+  isVisible    Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([groupName, displayOrder])
+}
+
+// ─── Media assets (files live on disk in UPLOAD_DIR; metadata here) ─────────
+
+model MediaAsset {
+  id               String   @id @default(cuid())
+  storageBucket    String   @default("media") // Supabase Storage bucket
+  storagePath      String // generated safe object key inside the bucket
+  originalFilename String
+  mimeType         String
+  fileSizeBytes    Int
+  altText          String   @default("")
+  caption          String?
+  isPublic         Boolean  @default(true)
+  width            Int?
+  height           Int?
+  createdAt        DateTime @default(now())
+
+  projectCovers Project[]         @relation("ProjectCover")
+  articleCovers ResearchArticle[] @relation("ArticleCover")
+  articlePdfs   ResearchArticle[] @relation("ArticlePdf")
+}
+
+// ─── Revisions & audit log ───────────────────────────────────────────────────
+
+model ContentRevision {
+  id             String   @id @default(cuid())
+  contentType    String // project | research_article
+  contentId      String
+  revisionNumber Int
+  snapshot       String // JSON snapshot of the record before the edit
+  createdAt      DateTime @default(now())
+
+  @@index([contentType, contentId, revisionNumber])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorEmail  String
+  action      String // create | update | publish | unpublish | archive | restore | delete | upload | login
+  contentType String
+  contentId   String?
+  metadata    String   @default("{}")
+  createdAt   DateTime @default(now())
+
+
+  @@index([createdAt])
+}
