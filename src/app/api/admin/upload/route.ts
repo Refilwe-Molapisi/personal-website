@@ -4,7 +4,6 @@ import { isAdmin } from "@/lib/auth";
 import { randomBytes } from "crypto";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
-import { supabaseConfigured, uploadMedia } from "@/lib/supabase/storage";
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8MB
 const ALLOWED = new Map<string, string>([
@@ -56,17 +55,11 @@ export async function POST(req: NextRequest) {
     const ext = ALLOWED.get(detected);
     const storagePath = `${Date.now()}-${randomBytes(8).toString("hex")}.${ext}`;
 
-    // ── Persist the bytes ──────────────────────────────────────────────────
-    // Production (Vercel): Supabase Storage — the server filesystem is
-    // ephemeral, so disk writes would be lost between requests.
-    // Local dev without Supabase env vars: fall back to ./uploads on disk.
-    if (supabaseConfigured()) {
-      await uploadMedia(buffer, storagePath, detected);
-    } else {
-      const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads");
-      await mkdir(uploadDir, { recursive: true });
-      await writeFile(path.join(uploadDir, storagePath), buffer);
-    }
+    // Persist to disk (UPLOAD_DIR, default ./uploads). On ephemeral hosts
+    // point UPLOAD_DIR at a persistent volume — see README deployment notes.
+    const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads");
+    await mkdir(uploadDir, { recursive: true });
+    await writeFile(path.join(uploadDir, storagePath), buffer);
 
     // Image dimensions via sharp (best-effort; PDFs have none)
     let width: number | null = null;

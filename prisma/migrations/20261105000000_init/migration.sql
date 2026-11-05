@@ -1,25 +1,10 @@
--- ═══════════════════════════════════════════════════════════════════════════
--- 0001_init.sql — initial schema (spec §5)
--- Refilwe Molapisi — Professional Analytics Portfolio
---
--- This is the authoritative DDL for the Supabase Postgres database and is
--- kept in lock-step with prisma/schema.prisma (generated with
--- `prisma migrate diff --from-empty --to-schema-datamodel`).
---
--- Apply in the Supabase SQL editor or with:
---   supabase db push            (Supabase CLI)
---   psql "$DIRECT_URL" -f supabase/migrations/0001_init.sql
---
--- Tables use quoted CamelCase identifiers because they are managed by
--- Prisma; do not rename without regenerating the Prisma client.
--- ═══════════════════════════════════════════════════════════════════════════
-
-
-CREATE SCHEMA IF NOT EXISTS "public";
+-- Initial schema — Refilwe Molapisi Analytics Portfolio
+-- Generated from prisma/schema.prisma (SQLite).
+-- Apply with: npx prisma migrate deploy
 
 -- CreateTable
 CREATE TABLE "SiteSettings" (
-    "id" TEXT NOT NULL DEFAULT 'singleton',
+    "id" TEXT NOT NULL PRIMARY KEY DEFAULT 'singleton',
     "displayName" TEXT NOT NULL DEFAULT 'Refilwe Molapisi',
     "headline" TEXT NOT NULL DEFAULT 'Final-year BCom Economics student',
     "intro" TEXT NOT NULL DEFAULT '',
@@ -32,28 +17,24 @@ CREATE TABLE "SiteSettings" (
     "footerText" TEXT NOT NULL DEFAULT '',
     "defaultMetaTitle" TEXT NOT NULL DEFAULT '',
     "defaultMetaDescription" TEXT NOT NULL DEFAULT '',
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "SiteSettings_pkey" PRIMARY KEY ("id")
+    "updatedAt" DATETIME NOT NULL
 );
 
 -- CreateTable
 CREATE TABLE "Category" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "contentType" TEXT NOT NULL DEFAULT 'both',
     "description" TEXT,
     "displayOrder" INTEGER NOT NULL DEFAULT 0,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "Category_pkey" PRIMARY KEY ("id")
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
 );
 
 -- CreateTable
 CREATE TABLE "Project" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "title" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "summary" TEXT NOT NULL,
@@ -88,17 +69,17 @@ CREATE TABLE "Project" (
     "status" TEXT NOT NULL DEFAULT 'draft',
     "metaTitle" TEXT,
     "metaDescription" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "publishedAt" TIMESTAMP(3),
-    "archivedAt" TIMESTAMP(3),
-
-    CONSTRAINT "Project_pkey" PRIMARY KEY ("id")
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    "publishedAt" DATETIME,
+    "archivedAt" DATETIME,
+    CONSTRAINT "Project_coverImageId_fkey" FOREIGN KEY ("coverImageId") REFERENCES "MediaAsset" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "Project_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
 CREATE TABLE "ResearchArticle" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "title" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "summary" TEXT NOT NULL,
@@ -118,26 +99,25 @@ CREATE TABLE "ResearchArticle" (
     "status" TEXT NOT NULL DEFAULT 'draft',
     "metaTitle" TEXT,
     "metaDescription" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "publishedAt" TIMESTAMP(3),
-    "archivedAt" TIMESTAMP(3),
-
-    CONSTRAINT "ResearchArticle_pkey" PRIMARY KEY ("id")
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    "publishedAt" DATETIME,
+    "archivedAt" DATETIME,
+    CONSTRAINT "ResearchArticle_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "ResearchArticle_coverImageId_fkey" FOREIGN KEY ("coverImageId") REFERENCES "MediaAsset" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "ResearchArticle_pdfAssetId_fkey" FOREIGN KEY ("pdfAssetId") REFERENCES "MediaAsset" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
 CREATE TABLE "Tag" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
-    "slug" TEXT NOT NULL,
-
-    CONSTRAINT "Tag_pkey" PRIMARY KEY ("id")
+    "slug" TEXT NOT NULL
 );
 
 -- CreateTable
 CREATE TABLE "Skill" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "groupName" TEXT NOT NULL DEFAULT 'Data analysis and BI',
@@ -146,16 +126,13 @@ CREATE TABLE "Skill" (
     "evidenceUrl" TEXT,
     "displayOrder" INTEGER NOT NULL DEFAULT 0,
     "isVisible" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "Skill_pkey" PRIMARY KEY ("id")
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
 );
 
 -- CreateTable
 CREATE TABLE "MediaAsset" (
-    "id" TEXT NOT NULL,
-    "storageBucket" TEXT NOT NULL DEFAULT 'media',
+    "id" TEXT NOT NULL PRIMARY KEY,
     "storagePath" TEXT NOT NULL,
     "originalFilename" TEXT NOT NULL,
     "mimeType" TEXT NOT NULL,
@@ -165,50 +142,44 @@ CREATE TABLE "MediaAsset" (
     "isPublic" BOOLEAN NOT NULL DEFAULT true,
     "width" INTEGER,
     "height" INTEGER,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "MediaAsset_pkey" PRIMARY KEY ("id")
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- CreateTable
 CREATE TABLE "ContentRevision" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "contentType" TEXT NOT NULL,
     "contentId" TEXT NOT NULL,
     "revisionNumber" INTEGER NOT NULL,
     "snapshot" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "ContentRevision_pkey" PRIMARY KEY ("id")
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- CreateTable
 CREATE TABLE "AuditLog" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "actorEmail" TEXT NOT NULL,
     "action" TEXT NOT NULL,
     "contentType" TEXT NOT NULL,
     "contentId" TEXT,
     "metadata" TEXT NOT NULL DEFAULT '{}',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "AuditLog_pkey" PRIMARY KEY ("id")
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- CreateTable
 CREATE TABLE "_ProjectToTag" (
     "A" TEXT NOT NULL,
     "B" TEXT NOT NULL,
-
-    CONSTRAINT "_ProjectToTag_AB_pkey" PRIMARY KEY ("A","B")
+    CONSTRAINT "_ProjectToTag_A_fkey" FOREIGN KEY ("A") REFERENCES "Project" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "_ProjectToTag_B_fkey" FOREIGN KEY ("B") REFERENCES "Tag" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
 CREATE TABLE "_ResearchArticleToTag" (
     "A" TEXT NOT NULL,
     "B" TEXT NOT NULL,
-
-    CONSTRAINT "_ResearchArticleToTag_AB_pkey" PRIMARY KEY ("A","B")
+    CONSTRAINT "_ResearchArticleToTag_A_fkey" FOREIGN KEY ("A") REFERENCES "ResearchArticle" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "_ResearchArticleToTag_B_fkey" FOREIGN KEY ("B") REFERENCES "Tag" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateIndex
@@ -251,35 +222,14 @@ CREATE INDEX "ContentRevision_contentType_contentId_revisionNumber_idx" ON "Cont
 CREATE INDEX "AuditLog_createdAt_idx" ON "AuditLog"("createdAt");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "_ProjectToTag_AB_unique" ON "_ProjectToTag"("A", "B");
+
+-- CreateIndex
 CREATE INDEX "_ProjectToTag_B_index" ON "_ProjectToTag"("B");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "_ResearchArticleToTag_AB_unique" ON "_ResearchArticleToTag"("A", "B");
+
+-- CreateIndex
 CREATE INDEX "_ResearchArticleToTag_B_index" ON "_ResearchArticleToTag"("B");
-
--- AddForeignKey
-ALTER TABLE "Project" ADD CONSTRAINT "Project_coverImageId_fkey" FOREIGN KEY ("coverImageId") REFERENCES "MediaAsset"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Project" ADD CONSTRAINT "Project_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ResearchArticle" ADD CONSTRAINT "ResearchArticle_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ResearchArticle" ADD CONSTRAINT "ResearchArticle_coverImageId_fkey" FOREIGN KEY ("coverImageId") REFERENCES "MediaAsset"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ResearchArticle" ADD CONSTRAINT "ResearchArticle_pdfAssetId_fkey" FOREIGN KEY ("pdfAssetId") REFERENCES "MediaAsset"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "_ProjectToTag" ADD CONSTRAINT "_ProjectToTag_A_fkey" FOREIGN KEY ("A") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "_ProjectToTag" ADD CONSTRAINT "_ProjectToTag_B_fkey" FOREIGN KEY ("B") REFERENCES "Tag"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "_ResearchArticleToTag" ADD CONSTRAINT "_ResearchArticleToTag_A_fkey" FOREIGN KEY ("A") REFERENCES "ResearchArticle"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "_ResearchArticleToTag" ADD CONSTRAINT "_ResearchArticleToTag_B_fkey" FOREIGN KEY ("B") REFERENCES "Tag"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 

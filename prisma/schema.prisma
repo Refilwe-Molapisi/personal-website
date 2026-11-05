@@ -1,18 +1,19 @@
 // Refilwe Molapisi — Professional Analytics Portfolio
 // Data model per professional_analytics_portfolio_spec.md §5
-// Hosted on Supabase Postgres. JSON-string fields are kept as text columns
-// (validated app-side) so the schema works identically on any Postgres host.
+// Database: SQLite via Prisma — a single file, no external services required.
+// JSON-string fields are kept as text columns (validated app-side).
 // NOTE: enums are avoided on purpose — status values are plain strings
-// validated in application code.
+// validated in application code. To move to a managed Postgres later, flip
+// `provider` to "postgresql" and point DATABASE_URL at the server — the
+// model definitions themselves are portable.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")   // pooled connection (pgBouncer, port 6543) — runtime queries
-  directUrl = env("DIRECT_URL")     // direct connection (port 5432) — migrations & introspection
+  provider = "sqlite"
+  url      = env("DATABASE_URL") // e.g. file:./dev.db (relative to this schema file)
 }
 
 // ─── Profile & site settings (singleton row, id = "singleton") ───────────────
@@ -172,8 +173,7 @@ model Skill {
 
 model MediaAsset {
   id               String   @id @default(cuid())
-  storageBucket    String   @default("media") // Supabase Storage bucket
-  storagePath      String // generated safe object key inside the bucket
+  storagePath      String // generated safe filename inside the uploads dir
   originalFilename String
   mimeType         String
   fileSizeBytes    Int

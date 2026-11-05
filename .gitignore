@@ -83,3 +83,7 @@ server.log
 
 # Prisma build artifacts
 *.tsbuildinfo
+
+# SQLite database files (Prisma + SQLite)
+*.db
+*.db-journal

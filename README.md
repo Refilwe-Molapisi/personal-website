@@ -19,8 +19,8 @@ animations throughout.
 | Styling | Tailwind CSS 4, custom Synkra token layer (`src/app/globals.css`) |
 | UI primitives | shadcn/ui (New York) + Lucide icons |
 | Animation | Framer Motion (scroll reveals, reduced-motion aware) + CSS keyframes |
-| Database | **Supabase Postgres** via Prisma ORM (`DATABASE_URL` pooled, `DIRECT_URL` direct) |
-| Media | **Supabase Storage** (`media` public bucket) with local-disk fallback in dev |
+| Database | **SQLite via Prisma ORM** — a single file, no external services (`DATABASE_URL=file:./dev.db`). Schema is portable: flip the provider to `postgresql`/`mysql` to move to any managed database |
+| Media | Disk-backed media store served via `/api/media/[id]` with signature validation |
 | Markdown | react-markdown + remark-gfm (raw HTML escaped — XSS-safe) |
 | Auth | Server-side HMAC-signed session cookie (HttpOnly) + login rate limiting |
 | Hosting | **Vercel** (`vercel.json` ships security headers) |
@@ -86,45 +86,51 @@ and the page is `noindex`.
 
 ---
 
-## Database & schema migrations (Supabase)
+## Database & schema migrations (Prisma + SQLite)
 
 `SiteSettings` (singleton) · `Project` · `ResearchArticle` · `Category` · `Tag` (m2m) ·
 `Skill` · `MediaAsset` · `ContentRevision` (snapshot history) · `AuditLog` (actor/action/timestamp).
 
-The SQL migrations in `supabase/migrations/` are the authoritative database DDL and
-are kept in lock-step with `prisma/schema.prisma`:
+The database is **SQLite** — Prisma manages the schema and all queries; nothing else
+to install or host. The schema is tracked in `prisma/schema.prisma`, and an initial
+migration lives in `prisma/migrations/20261105000000_init/` (created via
+`prisma migrate diff`, so `prisma migrate deploy` works from an empty database).
 
-| File | What it does |
-|---|---|
-| `0001_init.sql` | Creates all tables, unique slugs, status indexes and FK relations (`SetNull` for categories/covers) — generated from the Prisma schema |
-| `0002_rls.sql` | Enables **Row Level Security on every table** and grants anon/authenticated read access to *published* content only. No API-role writes are possible; all mutations go through the server-side admin (Prisma connection). `ContentRevision` and `AuditLog` have no policies at all (API-invisible) |
-| `0003_storage.sql` | Creates the public `media` Storage bucket (8 MB, JPEG/PNG/WebP/PDF allowlist) + public read policy. Uploads happen server-side with the service-role key after admin auth and magic-byte validation |
+Security: **all public queries go through server components that filter
+`status = "published"`**, and every admin mutation calls `requireAdmin()`
+server-side first. There is no database exposed to the network at all — SQLite is
+a local file, which replaces the RLS layer a hosted database would need. Uploads
+validate magic-byte signatures (JPEG/PNG/WebP/PDF only, ≤ 8 MB), generate random
+storage names, and require alt text.
 
-### Applying the schema
+### Creating / migrating the database
 
-**Option A — Supabase SQL editor / psql (recommended, no CLI needed):**
-1. Open the Supabase project → SQL editor.
-2. Run `supabase/migrations/0001_init.sql`, then `0002_rls.sql`, then `0003_storage.sql`.
-3. (Optional bootstrap) Run `supabase/seed.sql` for the site-settings row.
-
-**Option B — Supabase CLI:**
+**Development (recommended):**
 ```bash
-supabase link --project-ref <your-project-ref>
-supabase db push          # applies supabase/migrations in order
+npm run db:push           # sync prisma/schema.prisma straight to the SQLite file
+npm run db:seed           # idempotent starter content (prisma/seed.mjs)
 ```
 
-**Option C — Prisma (schema-first):**
+**Migration-based (empty database, e.g. a fresh clone or CI):**
 ```bash
-npm run db:push           # syncs prisma/schema.prisma to the database
+npx prisma migrate deploy   # applies prisma/migrations/ in order
+npm run db:seed
 ```
 
-Then seed starter content (settings, categories, skills, clearly-labelled
-simulated fixtures) from your machine, pointing at Supabase:
+> Use one or the other per environment: `db:push` for fast local iteration,
+> `migrate deploy` when you want the database built strictly from the tracked
+> migrations. Don't mix on the same file.
 
-```bash
-cp .env.example .env.local    # fill in the Supabase + admin values
-npm run db:seed               # prisma/seed.mjs — idempotent upserts
-```
+### Moving to a hosted database later
+
+The model definitions are portable. To move off SQLite (e.g. for multi-writer or
+serverless deployments):
+1. In `prisma/schema.prisma`, set `provider = "postgresql"` (or `"mysql"`).
+2. Point `DATABASE_URL` at the managed database.
+3. Regenerate the init migration for that engine
+   (`npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script`)
+   and run it, or `npm run db:push`.
+4. Update the media strategy (see Known limitations — disk storage is local).
 
 ---
 
@@ -135,16 +141,12 @@ See `.env.example`. Summary:
 | Variable | Purpose |
 |---|---|
 | `NEXT_PUBLIC_SITE_URL` | Canonical origin for metadata, sitemap, robots, llms.txt |
-| `DATABASE_URL` | Supabase Postgres **pooled** connection (port 6543, pgBouncer) |
-| `DIRECT_URL` | Supabase Postgres **direct** connection (port 5432) for migrations |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (Storage) |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server-only key used for Storage uploads — never exposed client-side |
-| `SUPABASE_MEDIA_BUCKET` | Storage bucket name (default `media`) |
+| `DATABASE_URL` | Prisma connection string. SQLite: `file:./dev.db` (path relative to `prisma/schema.prisma`) |
+| `UPLOAD_DIR` | Optional media directory (defaults to `./uploads`) |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Admin panel credentials (**change before deploying**) |
 | `AUTH_SECRET` | HMAC secret for session cookies (`openssl rand -base64 32`) |
 
-Secrets live in `.env.local` (git-ignored). Never commit them; if one leaks, rotate it.
+Secrets live in `.env` (git-ignored). Never commit them; if one leaks, rotate it.
 
 ---
 
@@ -152,42 +154,64 @@ Secrets live in `.env.local` (git-ignored). Never commit them; if one leaks, rot
 
 ```bash
 npm install
-cp .env.example .env.local        # point DATABASE_URL/DIRECT_URL at (any) Postgres
+cp .env.example .env              # SQLite default works as-is (file:./dev.db)
 npm run db:push                   # create/sync the database
 npm run db:seed                   # seed settings, categories, skills + starter fixtures
 npm run dev                       # http://localhost:3000
 ```
 
-Without Supabase env vars the media API falls back to local `./uploads` disk
-storage, so local development works with any Postgres (or even a local one).
+> Use `.env` (not `.env.local`) — the Prisma CLI reads `.env` from the project
+> root; Next.js reads it too. `.env.local` works for the Next dev server but is
+> invisible to `prisma` CLI commands.
+
+No external database or services are needed — SQLite is a local file and media
+uploads go to `./uploads` on disk.
 
 Starter content policy: the seed creates **clearly-labelled simulated fixtures**
 (synthetic-data case studies) so the design is populated on first run. They are
 intended to be replaced with real work via the admin panel — they are labelled as
 simulated everywhere they appear, and no credentials, employment or metrics are invented.
 
-## Deployment (Vercel + Supabase)
+## Deployment
 
-1. **Supabase**: create the project, run the three migrations (above), note the
-   Project URL, anon key, service-role key and the pooled/direct connection strings.
-2. **Vercel**: import this GitHub repository (framework auto-detected as Next.js).
-3. Add all environment variables from the table above for Production (and Preview).
-4. Set `NEXT_PUBLIC_SITE_URL` to the final domain (e.g. `https://refilwemolapisi.co.za`).
-5. Deploy, then verify:
+**On a VPS / always-on host (recommended for SQLite):**
+1. Provision a small Linux box, install Node 20+.
+2. Clone the repo, `npm ci`, create the database (`npm run db:push && npm run db:seed`),
+   set `NEXT_PUBLIC_SITE_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `AUTH_SECRET` in `.env`.
+3. `npm run build && npm run start` (standalone server) — the included `Caddyfile`
+   shows a reverse-proxy setup with TLS.
+
+Because the host is persistent, the SQLite file and `uploads/` directory keep all
+admin-managed content between restarts and deploys.
+
+**On Vercel (serverless — important caveats):**
+- The filesystem is ephemeral, so the SQLite database and `uploads/` media do not
+  persist between deploys or across server instances. Set
+  `DATABASE_URL=file:/tmp/dev.db` and re-run `db:push && db:seed` on each deploy
+  (or via the build command `npm run db:push && npm run db:seed && next build`) to
+  demo the site — but admin edits will be lost on redeploy.
+- For real, persistent admin-managed content on Vercel, switch to a hosted
+  database ("Moving to a hosted database later", above) and a persistent object
+  storage for media.
+
+Deploy steps either way:
+1. Import this GitHub repository (framework auto-detected as Next.js).
+2. Add the environment variables from the table above for Production (and Preview).
+3. Set `NEXT_PUBLIC_SITE_URL` to the final domain (e.g. `https://refilwemolapisi.co.za`).
+4. Deploy, then verify:
    - `/api/health` → `{"status":"ok","database":"up"}`
    - `/robots.txt`, `/sitemap.xml`, `/llms.txt`
    - Admin login → publish a test project → it appears on `/projects` and in the sitemap.
-6. Point your custom domain at Vercel and update `NEXT_PUBLIC_SITE_URL`.
+5. Point your custom domain and update `NEXT_PUBLIC_SITE_URL`.
 
-Builds run `postinstall → prisma generate` automatically; no manual steps on Vercel.
+Builds run `postinstall → prisma generate` automatically; no manual framework steps needed.
 
 ## Backup / recovery
 
-- **Database:** `pg_dump "$DIRECT_URL" > backup.sql` (Supabase dashboard backups on paid plans).
-- **Media:** the `media` Storage bucket (generated filenames only). Supabase Storage
-  is S3-backed; use `supabase storage download` or the dashboard to export.
+- **Database:** SQLite is a single file — back up `prisma/dev.db` (`sqlite3 dev.db ".backup backup.db"` or plain file copy while the server is stopped). To export to SQL: `sqlite3 dev.db .dump > backup.sql`.
+- **Media:** back up the `uploads/` directory (generated filenames only).
 - **Content:** every project/article edit snapshots the previous version into
-  `ContentRevision` (API-protected); restoring a snapshot is a manual DB operation.
+  `ContentRevision`; restoring a snapshot is a manual DB operation.
 
 ## Known limitations
 
@@ -196,5 +220,10 @@ Builds run `postinstall → prisma generate` automatically; no manual steps on V
   are never accepted).
 - Slug changes warn about broken links rather than auto-creating redirects.
 - Revision history stores snapshots but has no UI restore yet.
-- Listing search uses Postgres `LIKE`; upgrade to full-text search if the corpus grows.
+- Listing search uses SQLite `LIKE`; upgrade to full-text search or a hosted
+  Postgres if the corpus grows.
+- SQLite is single-writer: ideal for this portfolio's read-mostly traffic with one
+  admin, but not for concurrent heavy writes.
+- Media lives on local disk — on ephemeral hosts (serverless) uploads need a
+  persistent volume or object storage.
 - No visitor analytics (deliberate, per spec).

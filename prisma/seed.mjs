@@ -8,9 +8,25 @@
  * learning exercise using synthetic data, and is intended to be replaced or
  * deleted by the owner from the admin panel.
  *
- * Run with: npm run db:seed   (requires DATABASE_URL / DIRECT_URL in .env)
+ * Run with: npm run db:seed   (reads DATABASE_URL from .env at the project root)
  */
+import { readFileSync, existsSync } from "node:fs";
 import { PrismaClient } from "@prisma/client";
+
+// Minimal .env loader: plain `node` does not load .env files (unlike Next.js
+// or the Prisma CLI), so seed runs keep working with a plain project .env.
+if (!process.env.DATABASE_URL) {
+  for (const p of [".env", "prisma/.env"]) {
+    if (!existsSync(p)) continue;
+    for (const line of readFileSync(p, "utf8").split("\n")) {
+      const m = line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*(.*)\s*$/);
+      if (m && !(m[1] in process.env)) {
+        process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+      }
+    }
+    break;
+  }
+}
 
 const db = new PrismaClient();
 
