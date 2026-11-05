@@ -2,14 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import {
   BookOpen,
+  ExternalLink,
+  FolderKanban,
   Home,
   Linkedin,
-  FolderKanban,
-  Wrench,
+  Menu,
   UserRound,
-  ExternalLink,
+  Wrench,
+  X,
 } from "lucide-react";
 
 export const publicNavItems = [
@@ -29,124 +32,124 @@ type AppShellProps = {
 
 export function AppShell({ children, displayName, headline, linkedinUrl }: AppShellProps) {
   const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
   const isActive = (url: string) => (url === "/" ? pathname === "/" : pathname.startsWith(url));
-  const currentTitle = publicNavItems.find((i) => isActive(i.url))?.title ?? "Home";
+
+  const closeMenu = () => setMenuOpen(false);
 
   return (
     <div className="flex min-h-screen flex-col bg-[#F4F3F0] text-[#15161A]">
-      {/* ── Desktop floating dark pill sidebar ── */}
-      <aside className="fixed inset-y-4 left-4 z-40 hidden w-60 flex-col rounded-[2rem] bg-[#15161A] p-5 text-white shadow-2xl md:flex">
-        <Link href="/" className="flex items-center gap-2.5 px-2 pt-1 transition-opacity hover:opacity-90">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#D6F824]">
-            <span className="text-sm font-black text-[#141C00]">RM</span>
-          </div>
-          <span className="truncate text-base font-bold tracking-tight text-white">{displayName}</span>
-        </Link>
+      {/* ── Website header ─────────────────────────────────── */}
+      <header className="sticky top-0 z-40 border-b border-black/5 bg-[#F4F3F0]/90 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+          {/* Brand */}
+          <Link href="/" onClick={closeMenu} className="flex min-w-0 items-center gap-2.5 transition-opacity hover:opacity-90">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#15161A]">
+              <span className="text-[11px] font-black text-[#D6F824]">RM</span>
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-bold tracking-tight">{displayName}</span>
+              <span className="hidden truncate text-[10px] font-semibold uppercase tracking-wider text-gray-400 sm:block">
+                {headline}
+              </span>
+            </span>
+          </Link>
 
-        <nav aria-label="Primary" className="mt-8 flex flex-1 flex-col gap-1.5">
-          {publicNavItems.map((item) => (
-            <Link
-              key={item.url}
-              href={item.url}
-              aria-current={isActive(item.url) ? "page" : undefined}
-              className={`flex items-center gap-3 rounded-full px-4 py-2.5 text-sm transition-all duration-200 ${
-                isActive(item.url)
-                  ? "bg-[#D6F824] font-bold text-[#141C00] shadow-sm"
-                  : "font-medium text-white/60 hover:bg-white/10 hover:text-white"
-              }`}
+          {/* Desktop navigation */}
+          <nav aria-label="Primary" className="hidden items-center gap-1 md:flex">
+            {publicNavItems.map((item) => (
+              <Link
+                key={item.url}
+                href={item.url}
+                aria-current={isActive(item.url) ? "page" : undefined}
+                className={`rounded-full px-3.5 py-2 text-sm transition-all duration-200 ${
+                  isActive(item.url)
+                    ? "bg-white font-bold text-[#15161A] shadow-sm"
+                    : "font-medium text-gray-500 hover:text-[#15161A]"
+                }`}
+              >
+                {item.title}
+              </Link>
+            ))}
+          </nav>
+
+          {/* Right actions */}
+          <div className="flex items-center gap-2">
+            {linkedinUrl ? (
+              <a
+                href={linkedinUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${displayName} on LinkedIn (opens in a new tab)`}
+                className="hidden h-10 items-center gap-2 rounded-full bg-[#15161A] px-4 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#24262E] hover:shadow-md active:scale-95 sm:flex"
+              >
+                <Linkedin className="h-4 w-4" />
+                <span className="hidden lg:inline">LinkedIn</span>
+                <ExternalLink className="h-3 w-3 opacity-60" />
+              </a>
+            ) : null}
+
+            {/* Mobile menu toggle */}
+            <button
+              type="button"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-expanded={menuOpen}
+              aria-controls="mobile-nav"
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              className="grid h-10 w-10 place-items-center rounded-full bg-[#15161A] text-white shadow-sm transition-all active:scale-95 md:hidden"
             >
-              <item.icon className="h-4 w-4 shrink-0" />
-              <span>{item.title}</span>
-            </Link>
-          ))}
-        </nav>
-
-        <div className="rounded-2xl border border-white/5 bg-white/5 p-3.5">
-          <div className="flex items-center gap-3">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#FDE6D2] text-xs font-bold text-[#5c3a1e]">
-              RM
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-white">{displayName}</p>
-              <p className="truncate text-xs text-white/50">{headline}</p>
-            </div>
+              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
           </div>
         </div>
-      </aside>
 
-      {/* ── Main content area ── */}
-      <div className="flex min-h-screen flex-col md:pl-68">
-        <header className="sticky top-0 z-30 bg-[#F4F3F0]/85 backdrop-blur-md">
-          <div className="flex items-center gap-3 px-4 py-4 md:px-8">
-            {/* Mobile brand */}
-            <Link href="/" className="flex items-center gap-2 md:hidden">
-              <div className="grid h-9 w-9 place-items-center rounded-full bg-[#15161A]">
-                <span className="text-[11px] font-black text-[#D6F824]">RM</span>
-              </div>
-              <span className="text-base font-bold tracking-tight">{displayName}</span>
-            </Link>
-
-            {/* Desktop: current section pill */}
-            <div className="hidden min-w-0 flex-1 items-center md:flex">
-              <span className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white px-4 py-2 text-xs font-bold text-gray-500 shadow-sm">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#D6F824] ring-1 ring-black/10" aria-hidden />
-                {currentTitle}
-              </span>
-            </div>
-
-            <div className="ml-auto flex items-center gap-2.5">
-              {linkedinUrl ? (
-                <a
-                  href={linkedinUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`${displayName} on LinkedIn (opens in a new tab)`}
-                  className="flex h-10 items-center gap-2 rounded-full bg-[#15161A] px-4 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#24262E] hover:shadow-md active:scale-95"
-                >
-                  <Linkedin className="h-4 w-4" />
-                  <span className="hidden sm:inline">LinkedIn</span>
-                  <ExternalLink className="h-3 w-3 opacity-60 sm:hidden" />
-                </a>
-              ) : (
-                <span
-                  className="flex h-10 items-center gap-2 rounded-full border border-black/5 bg-white px-4 text-sm font-medium text-gray-400 shadow-sm"
-                  title="LinkedIn profile link can be set in the admin panel"
-                >
-                  <Linkedin className="h-4 w-4" />
-                  <span className="hidden sm:inline">LinkedIn</span>
-                </span>
-              )}
-            </div>
-          </div>
-        </header>
-
-        <main className="flex-1 px-4 pb-32 pt-2 md:px-8 md:pb-12">{children}</main>
-
-        <SiteFooter displayName={displayName} headline={headline} linkedinUrl={linkedinUrl} />
-      </div>
-
-      {/* ── Mobile floating pill nav ── */}
-      <nav
-        aria-label="Primary mobile"
-        className="fixed inset-x-4 bottom-4 z-40 flex items-center justify-between rounded-full border border-white/10 bg-[#15161A] px-3 py-2 shadow-2xl md:hidden"
-        style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
-      >
-        {publicNavItems.map((item) => (
-          <Link
-            key={item.url}
-            href={item.url}
-            aria-label={item.title}
-            aria-current={isActive(item.url) ? "page" : undefined}
-            className={`grid h-11 w-11 place-items-center rounded-full transition-all duration-200 ${
-              isActive(item.url)
-                ? "scale-105 bg-[#D6F824] text-[#141C00] shadow-sm"
-                : "text-white/60 active:scale-95"
-            }`}
+        {/* Mobile navigation panel */}
+        {menuOpen && (
+          <nav
+            id="mobile-nav"
+            aria-label="Primary mobile"
+            className="border-t border-black/5 bg-[#F4F3F0] px-4 pb-4 pt-2 md:hidden"
           >
-            <item.icon className="h-5 w-5" />
-          </Link>
-        ))}
-      </nav>
+            <ul className="flex flex-col gap-1">
+              {publicNavItems.map((item) => (
+                <li key={item.url}>
+                  <Link
+                    href={item.url}
+                    onClick={closeMenu}
+                    aria-current={isActive(item.url) ? "page" : undefined}
+                    className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-colors ${
+                      isActive(item.url)
+                        ? "bg-white font-bold text-[#15161A] shadow-sm"
+                        : "font-medium text-gray-500 hover:text-[#15161A]"
+                    }`}
+                  >
+                    <item.icon className="h-4 w-4 shrink-0" />
+                    <span>{item.title}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            {linkedinUrl && (
+              <a
+                href={linkedinUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={closeMenu}
+                className="mt-2 flex items-center gap-3 rounded-2xl bg-[#15161A] px-4 py-3 text-sm font-semibold text-white shadow-sm"
+              >
+                <Linkedin className="h-4 w-4 shrink-0" />
+                <span>Connect on LinkedIn</span>
+                <ExternalLink className="h-3 w-3 opacity-60" />
+              </a>
+            )}
+          </nav>
+        )}
+      </header>
+
+      {/* ── Page content ───────────────────────────────────── */}
+      <main className="flex-1 px-4 pb-16 pt-6 sm:px-6 md:pb-20">{children}</main>
+
+      <SiteFooter displayName={displayName} headline={headline} linkedinUrl={linkedinUrl} />
     </div>
   );
 }
@@ -161,8 +164,8 @@ function SiteFooter({
   linkedinUrl: string;
 }) {
   return (
-    <footer className="mt-auto px-4 pb-28 pt-6 md:px-8 md:pb-8">
-      <div className="bento flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+    <footer className="border-t border-black/5 px-4 pb-10 pt-8 sm:px-6">
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <p className="text-sm font-bold text-[#15161A]">{displayName}</p>
           <p className="mt-0.5 text-xs text-gray-500">{headline}</p>
@@ -178,8 +181,10 @@ function SiteFooter({
               LinkedIn <ExternalLink className="h-3 w-3" />
             </a>
           )}
-          <span className="text-gray-400">© {new Date().getFullYear()} {displayName}</span>
         </nav>
+      </div>
+      <div className="mx-auto mt-6 max-w-6xl border-t border-black/5 pt-4">
+        <p className="text-[11px] text-gray-400">© {new Date().getFullYear()} {displayName}</p>
       </div>
     </footer>
   );
